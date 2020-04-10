@@ -103,6 +103,7 @@ export class Trimesh extends Shape {
    * @param  {array} result An array of integers, referencing the queried triangles.
    */
   getTrianglesInAABB(aabb: AABB, result: number[]): number[] {
+    const unscaledAABB = new AABB()
     unscaledAABB.copy(aabb)
 
     // Scale it to local
@@ -144,7 +145,7 @@ export class Trimesh extends Shape {
    * @method updateNormals
    */
   updateNormals(): void {
-    const n = computeNormals_n
+    const n = new Vec3()
 
     // Generate normals
     const normals = this.normals
@@ -214,8 +215,8 @@ export class Trimesh extends Shape {
    * @param  {Vec3} vectorStore
    */
   getEdgeVector(edgeIndex: number, vectorStore: Vec3): void {
-    const va = getEdgeVector_va
-    const vb = getEdgeVector_vb
+    const va = new Vec3()
+    const vb = new Vec3()
     this.getEdgeVertex(edgeIndex, 0, va)
     this.getEdgeVertex(edgeIndex, 1, vb)
     vb.vsub(va, vectorStore)
@@ -439,13 +440,6 @@ export class Trimesh extends Shape {
   }
 }
 
-const computeNormals_n = new Vec3()
-
-const unscaledAABB = new AABB()
-
-const getEdgeVector_va = new Vec3()
-const getEdgeVector_vb = new Vec3()
-
 /**
  * Get face normal given 3 vertices
  * @static
@@ -455,9 +449,9 @@ const getEdgeVector_vb = new Vec3()
  * @param {Vec3} vc
  * @param {Vec3} target
  */
-const cb = new Vec3()
-const ab = new Vec3()
 Trimesh.computeNormal = (va: Vec3, vb: Vec3, vc: Vec3, target: Vec3): void => {
+  const cb = new Vec3()
+  const ab = new Vec3()
   vb.vsub(va, ab)
   vc.vsub(vb, cb)
   cb.cross(ab, target)
