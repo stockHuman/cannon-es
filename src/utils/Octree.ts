@@ -35,6 +35,7 @@ class OctreeNode {
    * @return {boolean} True if successful, otherwise false
    */
   insert(aabb: AABB, elementData: number, level = 0): boolean {
+    console.log(this)
     const nodeData = this.data
 
     // Ignore objects that do not belong in this node
@@ -61,25 +62,26 @@ class OctreeNode {
       }
 
       if (subdivided) {
-        // No children accepted! Might as well just remove em since they contain none
+        // No children accepted! Might as well just remove 'em since they contain none
         children.length = 0
       }
     }
 
-    // Too deep, or children didnt want it. add it in current node
+    // Too deep, or children didn't want it. add it in current node
     nodeData.push(elementData)
 
     return true
   }
 
   /**
-   * Create 8 equally sized children nodes and put them in the .children array.
+   * Create 8 equally sized child nodes and put them in the .children array.
    * @method subdivide
    */
   subdivide(): void {
     const aabb = this.aabb
     const l = aabb.lowerBound
     const u = aabb.upperBound
+    const halfDiagonal = new Vec3()
 
     const children = this.children
 
@@ -166,7 +168,8 @@ class OctreeNode {
    */
   rayQuery(ray: Ray, treeTransform: Transform, result: number[]): number[] {
     // Use aabb query for now.
-    // @todo implement real ray query which needs less lookups
+    const tmpAABB = new AABB()
+    /** @todo implement real ray query which needs less lookups */
     ray.getAABB(tmpAABB)
     tmpAABB.toLocalFrame(treeTransform, tmpAABB)
     this.aabbQuery(tmpAABB, result)
@@ -203,7 +206,3 @@ export class Octree extends OctreeNode {
     this.maxDepth = typeof options.maxDepth !== 'undefined' ? options.maxDepth : 8
   }
 }
-
-const halfDiagonal = new Vec3()
-
-const tmpAABB = new AABB()
