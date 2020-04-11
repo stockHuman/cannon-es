@@ -35,7 +35,6 @@ class OctreeNode {
    * @return {boolean} True if successful, otherwise false
    */
   insert(aabb: AABB, elementData: number, level = 0): boolean {
-    console.log(this)
     const nodeData = this.data
 
     // Ignore objects that do not belong in this node
