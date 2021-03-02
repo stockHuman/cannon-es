@@ -18,6 +18,8 @@ export type WheelInfoOptions = {
   dampingCompression?: number
   dampingRelaxation?: number
   frictionSlip?: number
+  forwardAcceleration?: number
+  sideAcceleration?: number
   steering?: number
   rotation?: number
   deltaRotation?: number
@@ -59,7 +61,7 @@ export type WheelRaycastResult = RaycastResult &
  * @param {number} [options.suspensionStiffness=100]
  * @param {number} [options.dampingCompression=10]
  * @param {number} [options.dampingRelaxation=10]
- * @param {number} [options.frictionSlip=10000]
+ * @param {number} [options.frictionSlip=10.5]
  * @param {number} [options.steering=0]
  * @param {number} [options.rotation=0]
  * @param {number} [options.deltaRotation=0]
@@ -93,6 +95,8 @@ export class WheelInfo {
   dampingCompression: number
   dampingRelaxation: number
   frictionSlip: number
+  forwardAcceleration: number
+  sideAcceleration: number
   steering: number
   rotation: number // Rotation value, in radians.
   deltaRotation: number
@@ -127,7 +131,9 @@ export class WheelInfo {
       suspensionStiffness: 100,
       dampingCompression: 10,
       dampingRelaxation: 10,
-      frictionSlip: 10000,
+      frictionSlip: 10.5,
+      forwardAcceleration: 1,
+      sideAcceleration: 1,
       steering: 0,
       rotation: 0,
       deltaRotation: 0,
@@ -162,6 +168,8 @@ export class WheelInfo {
     this.dampingCompression = options.dampingCompression!
     this.dampingRelaxation = options.dampingRelaxation!
     this.frictionSlip = options.frictionSlip!
+    this.forwardAcceleration = options.forwardAcceleration!
+    this.sideAcceleration = options.sideAcceleration!
     this.steering = 0
     this.rotation = 0
     this.deltaRotation = 0

@@ -42,9 +42,9 @@ export class RaycastVehicle {
     this.wheelInfos = []
     this.sliding = false
     this.world = null
-    this.indexRightAxis = typeof options.indexRightAxis !== 'undefined' ? options.indexRightAxis : 1
+    this.indexRightAxis = typeof options.indexRightAxis !== 'undefined' ? options.indexRightAxis : 2
     this.indexForwardAxis = typeof options.indexForwardAxis !== 'undefined' ? options.indexForwardAxis : 0
-    this.indexUpAxis = typeof options.indexUpAxis !== 'undefined' ? options.indexUpAxis : 2
+    this.indexUpAxis = typeof options.indexUpAxis !== 'undefined' ? options.indexUpAxis : 1
     this.constraints = []
     this.preStepCallback = () => {}
     this.currentVehicleSpeedKmHour = 0
@@ -504,8 +504,8 @@ export class RaycastVehicle {
 
         wheel.forwardImpulse = rollingFriction //wheelInfo.engineForce* timeStep;
 
-        const x = wheel.forwardImpulse * fwdFactor
-        const y = wheel.sideImpulse * sideFactor
+        const x = wheel.forwardImpulse * fwdFactor / wheel.forwardAcceleration
+        const y = wheel.sideImpulse * sideFactor / wheel.sideAcceleration
 
         const impulseSquared = x * x + y * y
 

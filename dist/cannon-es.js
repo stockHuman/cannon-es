@@ -10,8 +10,8 @@ class ObjectCollisionMatrix {
   }
   /**
    * @method get
-   * @param  {Body} i
-   * @param  {Body} j
+   * @param  {Body} bi
+   * @param  {Body} bj
    * @return {boolean}
    */
 
@@ -34,8 +34,8 @@ class ObjectCollisionMatrix {
   }
   /**
    * @method set
-   * @param  {Body} i
-   * @param  {Body} j
+   * @param  {Body} bi
+   * @param  {Body} bj
    * @param {boolean} value
    */
 
@@ -576,7 +576,7 @@ class Vec3 {
   /**
    * Vector cross product
    * @method cross
-   * @param {Vec3} v
+   * @param {Vec3} vector
    * @param {Vec3} target Optional. Target to save in.
    * @return {Vec3}
    */
@@ -622,7 +622,7 @@ class Vec3 {
   /**
    * Vector addition
    * @method vadd
-   * @param {Vec3} v
+   * @param {Vec3} vector
    * @param {Vec3} target Optional.
    * @return {Vec3}
    */
@@ -640,7 +640,7 @@ class Vec3 {
   /**
    * Vector subtraction
    * @method vsub
-   * @param {Vec3} v
+   * @param {Vec3} vector
    * @param {Vec3} target Optional. Target to save in.
    * @return {Vec3}
    */
@@ -829,7 +829,7 @@ class Vec3 {
   /**
    * Calculate dot product
    * @method dot
-   * @param {Vec3} v
+   * @param {Vec3} vector
    * @return {Number}
    */
 
@@ -929,7 +929,7 @@ class Vec3 {
   /**
    * Do a linear interpolation between two vectors
    * @method lerp
-   * @param {Vec3} v
+   * @param {Vec3} vector
    * @param {Number} t A number between 0 and 1. 0 will make this function return u, and 1 will make it return v. Numbers in between will generate a vector in between them.
    * @param {Vec3} target
    */
@@ -946,7 +946,7 @@ class Vec3 {
   /**
    * Check if a vector equals is almost equal to another one.
    * @method almostEquals
-   * @param {Vec3} v
+   * @param {Vec3} vector
    * @param {Number} precision
    * @return bool
    */
@@ -1337,8 +1337,8 @@ class ArrayCollisionMatrix {
   /**
    * Get an element
    * @method get
-   * @param  {Body} i
-   * @param  {Body} j
+   * @param  {Body} bi
+   * @param  {Body} bj
    * @return {Number}
    */
 
@@ -1362,8 +1362,8 @@ class ArrayCollisionMatrix {
   /**
    * Set an element
    * @method set
-   * @param {Body} i
-   * @param {Body} j
+   * @param {Body} bi
+   * @param {Body} bj
    * @param {boolean} value
    */
 
@@ -2268,6 +2268,28 @@ class ConvexPolyhedron extends Shape {
     ConvexPolyhedron.computeNormal(va, vb, vc, target);
   }
   /**
+   * Get face normal given 3 vertices
+   * @static
+   * @method computeNormal
+   * @param {Vec3} va
+   * @param {Vec3} vb
+   * @param {Vec3} vc
+   * @param {Vec3} target
+   */
+
+
+  static computeNormal(va, vb, vc, target) {
+    const cb = new Vec3();
+    const ab = new Vec3();
+    vb.vsub(va, ab);
+    vc.vsub(vb, cb);
+    cb.cross(ab, target);
+
+    if (!target.isZero()) {
+      target.normalize();
+    }
+  }
+  /**
    * @method clipAgainstHull
    * @param {Vec3} posA
    * @param {Quaternion} quatA
@@ -2937,84 +2959,65 @@ class ConvexPolyhedron extends Shape {
 
     return  -1;
   }
+  /**
+   * Get max and min dot product of a convex hull at position (pos,quat) projected onto an axis.
+   * Results are saved in the array maxmin.
+   * @static
+   * @method project
+   * @param {ConvexPolyhedron} hull
+   * @param {Vec3} axis
+   * @param {Vec3} pos
+   * @param {Quaternion} quat
+   * @param {array} result result[0] and result[1] will be set to maximum and minimum, respectively.
+   */
+
+
+  static project(shape, axis, pos, quat, result) {
+    const n = shape.vertices.length;
+    const localAxis = project_localAxis;
+    let max = 0;
+    let min = 0;
+    const localOrigin = project_localOrigin;
+    const vs = shape.vertices;
+    localOrigin.setZero(); // Transform the axis to local
+
+    Transform.vectorToLocalFrame(pos, quat, axis, localAxis);
+    Transform.pointToLocalFrame(pos, quat, localOrigin, localOrigin);
+    const add = localOrigin.dot(localAxis);
+    min = max = vs[0].dot(localAxis);
+
+    for (let i = 1; i < n; i++) {
+      const val = vs[i].dot(localAxis);
+
+      if (val > max) {
+        max = val;
+      }
+
+      if (val < min) {
+        min = val;
+      }
+    }
+
+    min -= add;
+    max -= add;
+
+    if (min > max) {
+      // Inconsistent - swap
+      const temp = min;
+      min = max;
+      max = temp;
+    } // Output
+
+
+    result[0] = max;
+    result[1] = min;
+  }
 
 }
-/**
- * Get face normal given 3 vertices
- * @static
- * @method computeNormal
- * @param {Vec3} va
- * @param {Vec3} vb
- * @param {Vec3} vc
- * @param {Vec3} target
- */
-
-ConvexPolyhedron.computeNormal = (va, vb, vc, target) => {
-  const cb = new Vec3();
-  const ab = new Vec3();
-  vb.vsub(va, ab);
-  vc.vsub(vb, cb);
-  cb.cross(ab, target);
-
-  if (!target.isZero()) {
-    target.normalize();
-  }
-};
-
 const maxminA = [];
 const maxminB = [];
-/**
- * Get max and min dot product of a convex hull at position (pos,quat) projected onto an axis.
- * Results are saved in the array maxmin.
- * @static
- * @method project
- * @param {ConvexPolyhedron} hull
- * @param {Vec3} axis
- * @param {Vec3} pos
- * @param {Quaternion} quat
- * @param {array} result result[0] and result[1] will be set to maximum and minimum, respectively.
- */
-
-ConvexPolyhedron.project = (shape, axis, pos, quat, result) => {
-  const n = shape.vertices.length;
-  const localAxis = new Vec3();
-  let max = 0;
-  let min = 0;
-  const localOrigin = new Vec3();
-  const vs = shape.vertices;
-  localOrigin.setZero(); // Transform the axis to local
-
-  Transform.vectorToLocalFrame(pos, quat, axis, localAxis);
-  Transform.pointToLocalFrame(pos, quat, localOrigin, localOrigin);
-  const add = localOrigin.dot(localAxis);
-  min = max = vs[0].dot(localAxis);
-
-  for (let i = 1; i < n; i++) {
-    const val = vs[i].dot(localAxis);
-
-    if (val > max) {
-      max = val;
-    }
-
-    if (val < min) {
-      min = val;
-    }
-  }
-
-  min -= add;
-  max -= add;
-
-  if (min > max) {
-    // Inconsistent - swap
-    const temp = min;
-    min = max;
-    max = temp;
-  } // Output
-
-
-  result[0] = max;
-  result[1] = min;
-};
+const project_localAxis = new Vec3();
+const project_localOrigin = new Vec3();
 
 /**
  * A 3d box shape.
@@ -3074,6 +3077,13 @@ class Box extends Shape {
   calculateLocalInertia(mass, target = new Vec3()) {
     Box.calculateInertia(this.halfExtents, mass, target);
     return target;
+  }
+
+  static calculateInertia(halfExtents, mass, target) {
+    const e = halfExtents;
+    target.x = 1.0 / 12.0 * mass * (2 * e.y * 2 * e.y + 2 * e.z * 2 * e.z);
+    target.y = 1.0 / 12.0 * mass * (2 * e.x * 2 * e.x + 2 * e.z * 2 * e.z);
+    target.z = 1.0 / 12.0 * mass * (2 * e.y * 2 * e.y + 2 * e.x * 2 * e.x);
   }
   /**
    * Get the box 6 side normals
@@ -3197,14 +3207,6 @@ class Box extends Shape {
   }
 
 }
-
-Box.calculateInertia = (halfExtents, mass, target) => {
-  const e = halfExtents;
-  target.x = 1.0 / 12.0 * mass * (2 * e.y * 2 * e.y + 2 * e.z * 2 * e.z);
-  target.y = 1.0 / 12.0 * mass * (2 * e.x * 2 * e.x + 2 * e.z * 2 * e.z);
-  target.z = 1.0 / 12.0 * mass * (2 * e.y * 2 * e.y + 2 * e.x * 2 * e.x);
-};
-
 const worldCornerTempPos = new Vec3();
 const worldCornersTemp = [new Vec3(), new Vec3(), new Vec3(), new Vec3(), new Vec3(), new Vec3(), new Vec3(), new Vec3()];
 
@@ -3322,7 +3324,7 @@ class Body extends EventTarget {
     }
 
     this.allowSleep = typeof options.allowSleep !== 'undefined' ? options.allowSleep : true;
-    this.sleepState = 0;
+    this.sleepState = Body.AWAKE;
     this.sleepSpeedLimit = typeof options.sleepSpeedLimit !== 'undefined' ? options.sleepSpeedLimit : 0.1;
     this.sleepTimeLimit = typeof options.sleepTimeLimit !== 'undefined' ? options.sleepTimeLimit : 1;
     this.timeLastSleepy = 0;
@@ -3389,7 +3391,7 @@ class Body extends EventTarget {
 
   wakeUp() {
     const prevState = this.sleepState;
-    this.sleepState = 0;
+    this.sleepState = Body.AWAKE;
     this.wakeUpAfterNarrowphase = false;
 
     if (prevState === Body.SLEEPING) {
@@ -3617,11 +3619,23 @@ class Body extends EventTarget {
       m1.mmult(m2, this.invInertiaWorld);
     }
   }
+  /**
+   * Apply force to a point of the body. This could for example be a point on the Body surface.
+   * Applying force this way will add to Body.force and Body.torque.
+   * @method applyForce
+   * @param  {Vec3} force The amount of force to add.
+   * @param  {Vec3} [relativePoint] A point relative to the center of mass to apply the force on.
+   */
 
-  applyForce(force, relativePoint) {
+
+  applyForce(force, relativePoint = new Vec3()) {
+    // Needed?
     if (this.type !== Body.DYNAMIC) {
-      // Needed?
       return;
+    }
+
+    if (this.sleepState === Body.SLEEPING) {
+      this.wakeUp();
     } // Compute produced rotational force
 
 
@@ -3632,8 +3646,15 @@ class Body extends EventTarget {
 
     this.torque.vadd(rotForce, this.torque);
   }
+  /**
+   * Apply force to a local point in the body.
+   * @method applyLocalForce
+   * @param  {Vec3} force The force vector to apply, defined locally in the body frame.
+   * @param  {Vec3} [localPoint] A local point in the body to apply the force on.
+   */
 
-  applyLocalForce(localForce, localPoint) {
+
+  applyLocalForce(localForce, localPoint = new Vec3()) {
     if (this.type !== Body.DYNAMIC) {
       return;
     }
@@ -3645,10 +3666,42 @@ class Body extends EventTarget {
     this.vectorToWorldFrame(localPoint, relativePointWorld);
     this.applyForce(worldForce, relativePointWorld);
   }
+  /**
+   * Apply torque to the body.
+   * @method applyTorque
+   * @param  {Vec3} torque The amount of torque to add.
+   */
 
-  applyImpulse(impulse, relativePoint) {
+
+  applyTorque(torque) {
     if (this.type !== Body.DYNAMIC) {
       return;
+    }
+
+    if (this.sleepState === Body.SLEEPING) {
+      this.wakeUp();
+    } // Add rotational force
+
+
+    this.torque.vadd(torque, this.torque);
+  }
+  /**
+   * Apply impulse to a point of the body. This could for example be a point on the Body surface.
+   * An impulse is a force added to a body during a short period of time (impulse = force * time).
+   * Impulses will be added to Body.velocity and Body.angularVelocity.
+   * @method applyImpulse
+   * @param  {Vec3} impulse The amount of impulse to add.
+   * @param  {Vec3} relativePoint A point relative to the center of mass to apply the force on.
+   */
+
+
+  applyImpulse(impulse, relativePoint = new Vec3()) {
+    if (this.type !== Body.DYNAMIC) {
+      return;
+    }
+
+    if (this.sleepState === Body.SLEEPING) {
+      this.wakeUp();
     } // Compute point position relative to the body center
 
 
@@ -3672,8 +3725,15 @@ class Body extends EventTarget {
 
     this.angularVelocity.vadd(rotVelo, this.angularVelocity);
   }
+  /**
+   * Apply locally-defined impulse to a local point in the body.
+   * @method applyLocalImpulse
+   * @param  {Vec3} force The force vector to apply, defined locally in the body frame.
+   * @param  {Vec3} localPoint A local point in the body to apply the force on.
+   */
 
-  applyLocalImpulse(localImpulse, localPoint) {
+
+  applyLocalImpulse(localImpulse, localPoint = new Vec3()) {
     if (this.type !== Body.DYNAMIC) {
       return;
     }
@@ -3850,39 +3910,11 @@ const tmpQuat$1 = new Quaternion();
 const computeAABB_shapeAABB = new AABB();
 const uiw_m1 = new Mat3();
 const uiw_m2 = new Mat3();
-/**
- * Apply force to a world point. This could for example be a point on the Body surface. Applying force this way will add to Body.force and Body.torque.
- * @method applyForce
- * @param  {Vec3} force The amount of force to add.
- * @param  {Vec3} relativePoint A point relative to the center of mass to apply the force on.
- */
-
 const Body_applyForce_rotForce = new Vec3();
-/**
- * Apply force to a local point in the body.
- * @method applyLocalForce
- * @param  {Vec3} force The force vector to apply, defined locally in the body frame.
- * @param  {Vec3} localPoint A local point in the body to apply the force on.
- */
-
 const Body_applyLocalForce_worldForce = new Vec3();
 const Body_applyLocalForce_relativePointWorld = new Vec3();
-/**
- * Apply impulse to a world point. This could for example be a point on the Body surface. An impulse is a force added to a body during a short period of time (impulse = force * time). Impulses will be added to Body.velocity and Body.angularVelocity.
- * @method applyImpulse
- * @param  {Vec3} impulse The amount of impulse to add.
- * @param  {Vec3} relativePoint A point relative to the center of mass to apply the force on.
- */
-
 const Body_applyImpulse_velo = new Vec3();
 const Body_applyImpulse_rotVelo = new Vec3();
-/**
- * Apply locally-defined impulse to a local point in the body.
- * @method applyLocalImpulse
- * @param  {Vec3} force The force vector to apply, defined locally in the body frame.
- * @param  {Vec3} localPoint A local point in the body to apply the force on.
- */
-
 const Body_applyLocalImpulse_worldImpulse = new Vec3();
 const Body_applyLocalImpulse_relativePoint = new Vec3();
 const Body_updateMassProperties_halfExtents = new Vec3();
@@ -3954,6 +3986,15 @@ class Broadphase {
       this.doBoundingSphereBroadphase(bodyA, bodyB, pairs1, pairs2);
     }
   }
+  /**
+   * Check if the bounding spheres of two bodies are intersecting.
+   * @method doBoundingSphereBroadphase
+   * @param {Body} bodyA
+   * @param {Body} bodyB
+   * @param {Array} pairs1 bodyA is appended to this array if intersection
+   * @param {Array} pairs2 bodyB is appended to this array if intersection
+   */
+
 
   doBoundingSphereBroadphase(bodyA, bodyB, pairs1, pairs2) {
     const r = Broadphase_collisionPairs_r;
@@ -3991,6 +4032,13 @@ class Broadphase {
       pairs2.push(bodyB);
     }
   }
+  /**
+   * Removes duplicate pairs from the pair arrays.
+   * @method makePairsUnique
+   * @param {Array} pairs1
+   * @param {Array} pairs2
+   */
+
 
   makePairsUnique(pairs1, pairs2) {
     const t = Broadphase_makePairsUnique_temp;
@@ -4031,6 +4079,24 @@ class Broadphase {
 
   setWorld(world) {}
   /**
+   * Check if the bounding spheres of two bodies overlap.
+   * @static
+   * @method boundingSphereCheck
+   * @param {Body} bodyA
+   * @param {Body} bodyB
+   * @return {boolean}
+   */
+
+
+  static boundingSphereCheck(bodyA, bodyB) {
+    const dist = new Vec3(); // bsc_dist;
+
+    bodyA.position.vsub(bodyB.position, dist);
+    const sa = bodyA.shapes[0];
+    const sb = bodyB.shapes[0];
+    return Math.pow(sa.boundingSphereRadius + sb.boundingSphereRadius, 2) > dist.lengthSquared();
+  }
+  /**
    * Returns all the bodies within the AABB.
    * @method aabbQuery
    * @param  {World} world
@@ -4045,39 +4111,14 @@ class Broadphase {
     return [];
   }
 
-}
-/**
- * Check if the bounding spheres of two bodies are intersecting.
- * @method doBoundingSphereBroadphase
- * @param {Body} bodyA
- * @param {Body} bodyB
- * @param {Array} pairs1 bodyA is appended to this array if intersection
- * @param {Array} pairs2 bodyB is appended to this array if intersection
- */
+} // Temp objects
 
-const // Temp objects
-Broadphase_collisionPairs_r = new Vec3();
-/**
- * Removes duplicate pairs from the pair arrays.
- * @method makePairsUnique
- * @param {Array} pairs1
- * @param {Array} pairs2
- */
-
+const Broadphase_collisionPairs_r = new Vec3();
 const Broadphase_makePairsUnique_temp = {
   keys: []
 };
 const Broadphase_makePairsUnique_p1 = [];
 const Broadphase_makePairsUnique_p2 = [];
-
-Broadphase.boundingSphereCheck = (bodyA, bodyB) => {
-  const dist = new Vec3(); // bsc_dist;
-
-  bodyA.position.vsub(bodyB.position, dist);
-  const sa = bodyA.shapes[0];
-  const sb = bodyB.shapes[0];
-  return Math.pow(sa.boundingSphereRadius + sb.boundingSphereRadius, 2) > dist.lengthSquared();
-};
 
 /**
  * Axis aligned uniform grid broadphase.
@@ -5038,6 +5079,7 @@ const Ray_intersectSphere_normal = new Vec3();
 Ray.prototype[Shape.types.SPHERE] = Ray.prototype._intersectSphere;
 const intersectConvex_normal = new Vec3();
 const intersectConvex_vector = new Vec3();
+Ray.prototype[Shape.types.CYLINDER] = Ray.prototype._intersectConvex;
 Ray.prototype[Shape.types.CONVEXPOLYHEDRON] = Ray.prototype._intersectConvex;
 const intersectTrimesh_normal = new Vec3();
 const intersectTrimesh_localDirection = new Vec3();
@@ -5391,25 +5433,26 @@ SAPBroadphase.checkBounds = (bi, bj, axisIndex) => {
   return boundB1 < boundA2;
 };
 
-function Utils() {}
-/**
- * Extend an options object with default values.
- * @static
- * @method defaults
- * @param  {object} options The options object. May be falsy: in this case, a new object is created and returned.
- * @param  {object} defaults An object containing default values.
- * @return {object} The modified options object.
- */
-
-Utils.defaults = (options = {}, defaults) => {
-  for (let key in defaults) {
-    if (!(key in options)) {
-      options[key] = defaults[key];
+class Utils {
+  /**
+   * Extend an options object with default values.
+   * @static
+   * @method defaults
+   * @param  {object} options The options object. May be falsy: in this case, a new object is created and returned.
+   * @param  {object} defaults An object containing default values.
+   * @return {object} The modified options object.
+   */
+  static defaults(options = {}, defaults) {
+    for (let key in defaults) {
+      if (!(key in options)) {
+        options[key] = defaults[key];
+      }
     }
+
+    return options;
   }
 
-  return options;
-};
+}
 
 /**
  * Constraint base class
@@ -6576,7 +6619,7 @@ const applyForce_tmp = new Vec3();
  * @param {number} [options.suspensionStiffness=100]
  * @param {number} [options.dampingCompression=10]
  * @param {number} [options.dampingRelaxation=10]
- * @param {number} [options.frictionSlip=10000]
+ * @param {number} [options.frictionSlip=10.5]
  * @param {number} [options.steering=0]
  * @param {number} [options.rotation=0]
  * @param {number} [options.deltaRotation=0]
@@ -6614,7 +6657,9 @@ class WheelInfo {
       suspensionStiffness: 100,
       dampingCompression: 10,
       dampingRelaxation: 10,
-      frictionSlip: 10000,
+      frictionSlip: 10.5,
+      forwardAcceleration: 1,
+      sideAcceleration: 1,
       steering: 0,
       rotation: 0,
       deltaRotation: 0,
@@ -6648,6 +6693,8 @@ class WheelInfo {
     this.dampingCompression = options.dampingCompression;
     this.dampingRelaxation = options.dampingRelaxation;
     this.frictionSlip = options.frictionSlip;
+    this.forwardAcceleration = options.forwardAcceleration;
+    this.sideAcceleration = options.sideAcceleration;
     this.steering = 0;
     this.rotation = 0;
     this.deltaRotation = 0;
@@ -6719,9 +6766,9 @@ class RaycastVehicle {
     this.wheelInfos = [];
     this.sliding = false;
     this.world = null;
-    this.indexRightAxis = typeof options.indexRightAxis !== 'undefined' ? options.indexRightAxis : 1;
+    this.indexRightAxis = typeof options.indexRightAxis !== 'undefined' ? options.indexRightAxis : 2;
     this.indexForwardAxis = typeof options.indexForwardAxis !== 'undefined' ? options.indexForwardAxis : 0;
-    this.indexUpAxis = typeof options.indexUpAxis !== 'undefined' ? options.indexUpAxis : 2;
+    this.indexUpAxis = typeof options.indexUpAxis !== 'undefined' ? options.indexUpAxis : 1;
     this.constraints = [];
 
     this.preStepCallback = () => {};
@@ -7141,8 +7188,8 @@ class RaycastVehicle {
         const maximpSquared = maximp * maximpSide;
         wheel.forwardImpulse = rollingFriction; //wheelInfo.engineForce* timeStep;
 
-        const x = wheel.forwardImpulse * fwdFactor;
-        const y = wheel.sideImpulse * sideFactor;
+        const x = wheel.forwardImpulse * fwdFactor / wheel.forwardAcceleration;
+        const y = wheel.sideImpulse * sideFactor / wheel.sideAcceleration;
         const impulseSquared = x * x + y * y;
         wheel.sliding = false;
 
@@ -7362,7 +7409,7 @@ class RigidVehicle {
       // No chassis body given. Create it!
       this.chassisBody = new Body({
         mass: 1,
-        shape: new Box(new Vec3(5, 2, 0.5))
+        shape: new Box(new Vec3(5, 0.5, 2))
       });
     }
 
@@ -7403,7 +7450,7 @@ class RigidVehicle {
     this.chassisBody.pointToWorldFrame(position, worldPosition);
     wheelBody.position.set(worldPosition.x, worldPosition.y, worldPosition.z); // Constrain wheel
 
-    const axis = typeof options.axis !== 'undefined' ? options.axis.clone() : new Vec3(0, 1, 0);
+    const axis = typeof options.axis !== 'undefined' ? options.axis.clone() : new Vec3(0, 0, 1);
     this.wheelAxes.push(axis);
     const hingeConstraint = new HingeConstraint(this.chassisBody, wheelBody, {
       pivotA: position,
@@ -7430,8 +7477,8 @@ class RigidVehicle {
     const c = Math.cos(value);
     const s = Math.sin(value);
     const x = axis.x;
-    const y = axis.y;
-    this.constraints[wheelIndex].axisA.set(c * x - s * y, s * x + c * y, 0);
+    const z = axis.z;
+    this.constraints[wheelIndex].axisA.set(-c * x + s * z, 0, s * x + c * z);
   }
   /**
    * Set the target rotational speed of the hinge constraint.
@@ -7754,7 +7801,15 @@ const SPHSystem_update_u = new Vec3();
  */
 
 class Cylinder extends ConvexPolyhedron {
-  constructor(radiusTop, radiusBottom, height, numSegments) {
+  constructor(radiusTop = 1, radiusBottom = 1, height = 1, numSegments = 8) {
+    if (radiusTop < 0) {
+      throw new Error('The cylinder radiusTop cannot be negative.');
+    }
+
+    if (radiusBottom < 0) {
+      throw new Error('The cylinder radiusBottom cannot be negative.');
+    }
+
     const N = numSegments;
     const vertices = [];
     const axes = [];
@@ -7764,10 +7819,10 @@ class Cylinder extends ConvexPolyhedron {
     const cos = Math.cos;
     const sin = Math.sin; // First bottom point
 
-    vertices.push(new Vec3(radiusBottom * cos(0), -height * 0.5, -radiusBottom * sin(0)));
+    vertices.push(new Vec3(-radiusBottom * sin(0), -height * 0.5, radiusBottom * cos(0)));
     bottomface.push(0); // First top point
 
-    vertices.push(new Vec3(radiusTop * cos(0), height * 0.5, -radiusTop * sin(0)));
+    vertices.push(new Vec3(-radiusTop * sin(0), height * 0.5, radiusTop * cos(0)));
     topface.push(1);
 
     for (let i = 0; i < N; i++) {
@@ -7776,30 +7831,30 @@ class Cylinder extends ConvexPolyhedron {
 
       if (i < N - 1) {
         // Bottom
-        vertices.push(new Vec3(radiusBottom * cos(theta), -height * 0.5, -radiusBottom * sin(theta)));
+        vertices.push(new Vec3(-radiusBottom * sin(theta), -height * 0.5, radiusBottom * cos(theta)));
         bottomface.push(2 * i + 2); // Top
 
-        vertices.push(new Vec3(radiusTop * cos(theta), height * 0.5, -radiusTop * sin(theta)));
+        vertices.push(new Vec3(-radiusTop * sin(theta), height * 0.5, radiusTop * cos(theta)));
         topface.push(2 * i + 3); // Face
 
-        faces.push([2 * i + 2, 2 * i + 3, 2 * i + 1, 2 * i]);
+        faces.push([2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2]);
       } else {
-        faces.push([0, 1, 2 * i + 1, 2 * i]); // Connect
+        faces.push([2 * i, 2 * i + 1, 1, 0]); // Connect
       } // Axis: we can cut off half of them if we have even number of segments
 
 
       if (N % 2 === 1 || i < N / 2) {
-        axes.push(new Vec3(cos(thetaN), 0, -sin(thetaN)));
+        axes.push(new Vec3(-sin(thetaN), 0, cos(thetaN)));
       }
     }
 
-    faces.push(topface);
-    axes.push(new Vec3(0, 1, 0)); // Reorder bottom face
+    faces.push(bottomface);
+    axes.push(new Vec3(0, 1, 0)); // Reorder top face
 
     const temp = [];
 
-    for (let i = 0; i < bottomface.length; i++) {
-      temp.push(bottomface[bottomface.length - i - 1]);
+    for (let i = 0; i < topface.length; i++) {
+      temp.push(topface[topface.length - i - 1]);
     }
 
     faces.push(temp);
@@ -7808,6 +7863,11 @@ class Cylinder extends ConvexPolyhedron {
       faces,
       axes
     });
+    this.type = Shape.types.CYLINDER;
+    this.radiusTop = radiusTop;
+    this.radiusBottom = radiusBottom;
+    this.height = height;
+    this.numSegments = numSegments;
   }
 
 }
@@ -8343,9 +8403,9 @@ class Heightfield extends Shape {
       verts[1].set(0.75 * elementSize, -0.25 * elementSize, data[xi + 1][yi] - h);
       verts[2].set(-0.25 * elementSize, 0.75 * elementSize, data[xi][yi + 1] - h); // bottom triangle verts
 
-      verts[3].set(-0.25 * elementSize, -0.25 * elementSize, -h - 1);
-      verts[4].set(0.75 * elementSize, -0.25 * elementSize, -h - 1);
-      verts[5].set(-0.25 * elementSize, 0.75 * elementSize, -h - 1); // top triangle
+      verts[3].set(-0.25 * elementSize, -0.25 * elementSize, -Math.abs(h) - 1);
+      verts[4].set(0.75 * elementSize, -0.25 * elementSize, -Math.abs(h) - 1);
+      verts[5].set(-0.25 * elementSize, 0.75 * elementSize, -Math.abs(h) - 1); // top triangle
 
       faces[0][0] = 0;
       faces[0][1] = 1;
@@ -8379,9 +8439,9 @@ class Heightfield extends Shape {
       verts[1].set(-0.75 * elementSize, 0.25 * elementSize, data[xi][yi + 1] - h);
       verts[2].set(0.25 * elementSize, -0.75 * elementSize, data[xi + 1][yi] - h); // bottom triangle verts
 
-      verts[3].set(0.25 * elementSize, 0.25 * elementSize, -h - 1);
-      verts[4].set(-0.75 * elementSize, 0.25 * elementSize, -h - 1);
-      verts[5].set(0.25 * elementSize, -0.75 * elementSize, -h - 1); // Top triangle
+      verts[3].set(0.25 * elementSize, 0.25 * elementSize, -Math.abs(h) - 1);
+      verts[4].set(-0.75 * elementSize, 0.25 * elementSize, -Math.abs(h) - 1);
+      verts[5].set(0.25 * elementSize, -0.75 * elementSize, -Math.abs(h) - 1); // Top triangle
 
       faces[0][0] = 0;
       faces[0][1] = 1;
@@ -8943,6 +9003,26 @@ class Trimesh extends Shape {
     vb.vsub(va, vectorStore);
   }
   /**
+   * Get face normal given 3 vertices
+   * @static
+   * @method computeNormal
+   * @param {Vec3} va
+   * @param {Vec3} vb
+   * @param {Vec3} vc
+   * @param {Vec3} target
+   */
+
+
+  static computeNormal(va, vb, vc, target) {
+    vb.vsub(va, ab);
+    vc.vsub(vb, cb);
+    cb.cross(ab, target);
+
+    if (!target.isZero()) {
+      target.normalize();
+    }
+  }
+  /**
    * Get vertex i.
    * @method getVertex
    * @param  {number} i
@@ -9166,35 +9246,55 @@ class Trimesh extends Shape {
   volume() {
     return 4.0 * Math.PI * this.boundingSphereRadius / 3.0;
   }
+  /**
+   * Create a Trimesh instance, shaped as a torus.
+   * @static
+   * @method createTorus
+   * @param  {number} [radius=1]
+   * @param  {number} [tube=0.5]
+   * @param  {number} [radialSegments=8]
+   * @param  {number} [tubularSegments=6]
+   * @param  {number} [arc=6.283185307179586]
+   * @return {Trimesh} A torus
+   */
+
+
+  static createTorus(radius = 1, tube = 0.5, radialSegments = 8, tubularSegments = 6, arc = Math.PI * 2) {
+    const vertices = [];
+    const indices = [];
+
+    for (let j = 0; j <= radialSegments; j++) {
+      for (let i = 0; i <= tubularSegments; i++) {
+        const u = i / tubularSegments * arc;
+        const v = j / radialSegments * Math.PI * 2;
+        const x = (radius + tube * Math.cos(v)) * Math.cos(u);
+        const y = (radius + tube * Math.cos(v)) * Math.sin(u);
+        const z = tube * Math.sin(v);
+        vertices.push(x, y, z);
+      }
+    }
+
+    for (let j = 1; j <= radialSegments; j++) {
+      for (let i = 1; i <= tubularSegments; i++) {
+        const a = (tubularSegments + 1) * j + i - 1;
+        const b = (tubularSegments + 1) * (j - 1) + i - 1;
+        const c = (tubularSegments + 1) * (j - 1) + i;
+        const d = (tubularSegments + 1) * j + i;
+        indices.push(a, b, d);
+        indices.push(b, c, d);
+      }
+    }
+
+    return new Trimesh(vertices, indices);
+  }
 
 }
 const computeNormals_n = new Vec3();
 const unscaledAABB = new AABB();
 const getEdgeVector_va = new Vec3();
 const getEdgeVector_vb = new Vec3();
-/**
- * Get face normal given 3 vertices
- * @static
- * @method computeNormal
- * @param {Vec3} va
- * @param {Vec3} vb
- * @param {Vec3} vc
- * @param {Vec3} target
- */
-
 const cb = new Vec3();
 const ab = new Vec3();
-
-Trimesh.computeNormal = (va, vb, vc, target) => {
-  vb.vsub(va, ab);
-  vc.vsub(vb, cb);
-  cb.cross(ab, target);
-
-  if (!target.isZero()) {
-    target.normalize();
-  }
-};
-
 const va = new Vec3();
 const vb = new Vec3();
 const vc = new Vec3();
@@ -9202,46 +9302,6 @@ const cli_aabb = new AABB();
 const computeLocalAABB_worldVert = new Vec3();
 const calculateWorldAABB_frame = new Transform();
 const calculateWorldAABB_aabb = new AABB();
-/**
- * Create a Trimesh instance, shaped as a torus.
- * @static
- * @method createTorus
- * @param  {number} [radius=1]
- * @param  {number} [tube=0.5]
- * @param  {number} [radialSegments=8]
- * @param  {number} [tubularSegments=6]
- * @param  {number} [arc=6.283185307179586]
- * @return {Trimesh} A torus
- */
-
-Trimesh.createTorus = (radius = 1, tube = 0.5, radialSegments = 8, tubularSegments = 6, arc = Math.PI * 2) => {
-  const vertices = [];
-  const indices = [];
-
-  for (let j = 0; j <= radialSegments; j++) {
-    for (let i = 0; i <= tubularSegments; i++) {
-      const u = i / tubularSegments * arc;
-      const v = j / radialSegments * Math.PI * 2;
-      const x = (radius + tube * Math.cos(v)) * Math.cos(u);
-      const y = (radius + tube * Math.cos(v)) * Math.sin(u);
-      const z = tube * Math.sin(v);
-      vertices.push(x, y, z);
-    }
-  }
-
-  for (let j = 1; j <= radialSegments; j++) {
-    for (let i = 1; i <= tubularSegments; i++) {
-      const a = (tubularSegments + 1) * j + i - 1;
-      const b = (tubularSegments + 1) * (j - 1) + i - 1;
-      const c = (tubularSegments + 1) * (j - 1) + i;
-      const d = (tubularSegments + 1) * j + i;
-      indices.push(a, b, d);
-      indices.push(b, c, d);
-    }
-  }
-
-  return new Trimesh(vertices, indices);
-};
 
 /**
  * Constraint equation solver base class.
@@ -9707,6 +9767,10 @@ class Vec3Pool extends Pool {
 
 }
 
+// Naming rule: based of the order in SHAPE_TYPES,
+// the first part of the method is formed by the
+// shape type that comes before, in the second part
+// there is the shape type that comes after in the SHAPE_TYPES list
 const COLLISION_TYPES = {
   sphereSphere: Shape.types.SPHERE,
   spherePlane: Shape.types.SPHERE | Shape.types.PLANE,
@@ -9724,6 +9788,13 @@ const COLLISION_TYPES = {
   planeParticle: Shape.types.PLANE | Shape.types.PARTICLE,
   boxParticle: Shape.types.BOX | Shape.types.PARTICLE,
   convexParticle: Shape.types.PARTICLE | Shape.types.CONVEXPOLYHEDRON,
+  cylinderCylinder: Shape.types.CYLINDER,
+  sphereCylinder: Shape.types.SPHERE | Shape.types.CYLINDER,
+  planeCylinder: Shape.types.PLANE | Shape.types.CYLINDER,
+  boxCylinder: Shape.types.BOX | Shape.types.CYLINDER,
+  convexCylinder: Shape.types.CONVEXPOLYHEDRON | Shape.types.CYLINDER,
+  heightfieldCylinder: Shape.types.HEIGHTFIELD | Shape.types.CYLINDER,
+  particleCylinder: Shape.types.PARTICLE | Shape.types.CYLINDER,
   sphereTrimesh: Shape.types.SPHERE | Shape.types.TRIMESH,
   planeTrimesh: Shape.types.PLANE | Shape.types.TRIMESH
 };
@@ -9975,21 +10046,21 @@ class Narrowphase {
     } // We will have only one contact in this case
 
 
-    const r = this.createContactEquation(bi, bj, si, sj, rsi, rsj); // Contact normal
+    const contactEq = this.createContactEquation(bi, bj, si, sj, rsi, rsj); // Contact normal
 
-    xj.vsub(xi, r.ni);
-    r.ni.normalize(); // Contact point locations
+    xj.vsub(xi, contactEq.ni);
+    contactEq.ni.normalize(); // Contact point locations
 
-    r.ri.copy(r.ni);
-    r.rj.copy(r.ni);
-    r.ri.scale(si.radius, r.ri);
-    r.rj.scale(-sj.radius, r.rj);
-    r.ri.vadd(xi, r.ri);
-    r.ri.vsub(bi.position, r.ri);
-    r.rj.vadd(xj, r.rj);
-    r.rj.vsub(bj.position, r.rj);
-    this.result.push(r);
-    this.createFrictionEquationsFromContact(r, this.frictionResult);
+    contactEq.ri.copy(contactEq.ni);
+    contactEq.rj.copy(contactEq.ni);
+    contactEq.ri.scale(si.radius, contactEq.ri);
+    contactEq.rj.scale(-sj.radius, contactEq.rj);
+    contactEq.ri.vadd(xi, contactEq.ri);
+    contactEq.ri.vsub(bi.position, contactEq.ri);
+    contactEq.rj.vadd(xj, contactEq.rj);
+    contactEq.rj.vsub(bj.position, contactEq.rj);
+    this.result.push(contactEq);
+    this.createFrictionEquationsFromContact(contactEq, this.frictionResult);
   }
 
   spherePlane(si, sj, xi, xj, qi, qj, bi, bj, rsi, rsj, justTest) {
@@ -10891,6 +10962,14 @@ class Narrowphase {
     }
   }
 
+  heightfieldCylinder(hfShape, convexShape, hfPos, convexPos, hfQuat, convexQuat, hfBody, convexBody, rsi, rsj, justTest) {
+    return this.convexHeightfield(convexShape, hfShape, convexPos, hfPos, convexQuat, hfQuat, convexBody, hfBody, rsi, rsj, justTest);
+  }
+
+  particleCylinder(si, sj, xi, xj, qi, qj, bi, bj, rsi, rsj, justTest) {
+    return this.convexParticle(sj, si, xj, xi, qj, qi, bj, bi, rsi, rsj, justTest);
+  }
+
   sphereTrimesh(sphereShape, trimeshShape, spherePos, trimeshPos, sphereQuat, trimeshQuat, sphereBody, trimeshBody, rsi, rsj, justTest) {
     const edgeVertexA = sphereTrimesh_edgeVertexA;
     const edgeVertexB = sphereTrimesh_edgeVertexB;
@@ -11243,7 +11322,14 @@ const particlePlane_relpos = new Vec3();
 const particlePlane_projected = new Vec3();
 Narrowphase.prototype[COLLISION_TYPES.planeParticle] = Narrowphase.prototype.planeParticle;
 const particleSphere_normal = new Vec3();
-Narrowphase.prototype[COLLISION_TYPES.sphereParticle] = Narrowphase.prototype.sphereParticle; // WIP
+Narrowphase.prototype[COLLISION_TYPES.sphereParticle] = Narrowphase.prototype.sphereParticle;
+Narrowphase.prototype[COLLISION_TYPES.cylinderCylinder] = Narrowphase.prototype.convexConvex;
+Narrowphase.prototype[COLLISION_TYPES.sphereCylinder] = Narrowphase.prototype.sphereConvex;
+Narrowphase.prototype[COLLISION_TYPES.planeCylinder] = Narrowphase.prototype.planeConvex;
+Narrowphase.prototype[COLLISION_TYPES.boxCylinder] = Narrowphase.prototype.boxConvex;
+Narrowphase.prototype[COLLISION_TYPES.convexCylinder] = Narrowphase.prototype.convexConvex;
+Narrowphase.prototype[COLLISION_TYPES.heightfieldCylinder] = Narrowphase.prototype.heightfieldCylinder;
+Narrowphase.prototype[COLLISION_TYPES.particleCylinder] = Narrowphase.prototype.particleCylinder; // WIP
 
 const cqj = new Quaternion();
 const convexParticle_local = new Vec3();
@@ -11799,14 +11885,15 @@ class World extends EventTarget {
    */
 
 
-  step(dt, timeSinceLastCalled = 0, maxSubSteps = 10) {
-    if (timeSinceLastCalled === 0) {
+  step(dt, timeSinceLastCalled, maxSubSteps = 10) {
+    if (timeSinceLastCalled === undefined) {
       // Fixed, simple stepping
       this.internalStep(dt); // Increment time
 
       this.time += dt;
     } else {
       this.accumulator += timeSinceLastCalled;
+      const t0 = performance.now();
       let substeps = 0;
 
       while (this.accumulator >= dt && substeps < maxSubSteps) {
@@ -11814,9 +11901,19 @@ class World extends EventTarget {
         this.internalStep(dt);
         this.accumulator -= dt;
         substeps++;
-      }
 
-      const t = this.accumulator % dt / dt;
+        if (performance.now() - t0 > dt * 1000) {
+          // The framerate is not interactive anymore.
+          // We are below the target framerate.
+          // Better bail out.
+          break;
+        }
+      } // Remove the excess accumulator, since we may not
+      // have had enough substeps available to catch up
+
+
+      this.accumulator = this.accumulator % dt;
+      const t = this.accumulator / dt;
 
       for (let j = 0; j !== this.bodies.length; j++) {
         const b = this.bodies[j];
@@ -12192,11 +12289,9 @@ class World extends EventTarget {
 } // Temp stuff
 
 const tmpAABB1 = new AABB();
-const tmpRay$1 = new Ray(); // performance.now()
+const tmpRay$1 = new Ray(); // performance.now() fallback on Date.now()
 
-if (typeof performance === 'undefined') {
-  performance = {};
-}
+const performance = globalThis.performance || {};
 
 if (!performance.now) {
   let nowOffset = Date.now();

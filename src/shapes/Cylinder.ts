@@ -1,5 +1,6 @@
 import { ConvexPolyhedron } from '../shapes/ConvexPolyhedron'
 import { Vec3 } from '../math/Vec3'
+import { Shape } from './Shape'
 
 /**
  * @class Cylinder
@@ -12,7 +13,20 @@ import { Vec3 } from '../math/Vec3'
  * @param {Number} numSegments The number of segments to build the cylinder out of
  */
 export class Cylinder extends ConvexPolyhedron {
-  constructor(radiusTop: number, radiusBottom: number, height: number, numSegments: number) {
+  radiusTop: number
+  radiusBottom: number
+  height: number
+  numSegments: number
+
+  constructor(radiusTop: number = 1, radiusBottom: number = 1, height: number = 1, numSegments: number = 8) {
+    if (radiusTop < 0) {
+      throw new Error('The cylinder radiusTop cannot be negative.')
+    }
+
+    if (radiusBottom < 0) {
+      throw new Error('The cylinder radiusBottom cannot be negative.')
+    }
+
     const N = numSegments
     const vertices = []
     const axes = []
@@ -23,11 +37,11 @@ export class Cylinder extends ConvexPolyhedron {
     const sin = Math.sin
 
     // First bottom point
-    vertices.push(new Vec3(radiusBottom * cos(0), -height * 0.5, -radiusBottom * sin(0)))
+    vertices.push(new Vec3(-radiusBottom * sin(0), -height * 0.5, radiusBottom * cos(0)))
     bottomface.push(0)
 
     // First top point
-    vertices.push(new Vec3(radiusTop * cos(0), height * 0.5, -radiusTop * sin(0)))
+    vertices.push(new Vec3(-radiusTop * sin(0), height * 0.5, radiusTop * cos(0)))
     topface.push(1)
 
     for (let i = 0; i < N; i++) {
@@ -35,33 +49,39 @@ export class Cylinder extends ConvexPolyhedron {
       const thetaN = ((2 * Math.PI) / N) * (i + 0.5)
       if (i < N - 1) {
         // Bottom
-        vertices.push(new Vec3(radiusBottom * cos(theta), -height * 0.5, -radiusBottom * sin(theta)))
+        vertices.push(new Vec3(-radiusBottom * sin(theta), -height * 0.5, radiusBottom * cos(theta)))
         bottomface.push(2 * i + 2)
         // Top
-        vertices.push(new Vec3(radiusTop * cos(theta), height * 0.5, -radiusTop * sin(theta)))
+        vertices.push(new Vec3(-radiusTop * sin(theta), height * 0.5, radiusTop * cos(theta)))
         topface.push(2 * i + 3)
 
         // Face
-        faces.push([2 * i + 2, 2 * i + 3, 2 * i + 1, 2 * i])
+        faces.push([2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2])
       } else {
-        faces.push([0, 1, 2 * i + 1, 2 * i]) // Connect
+        faces.push([2 * i, 2 * i + 1, 1, 0]) // Connect
       }
 
       // Axis: we can cut off half of them if we have even number of segments
       if (N % 2 === 1 || i < N / 2) {
-        axes.push(new Vec3(cos(thetaN), 0, -sin(thetaN)))
+        axes.push(new Vec3(-sin(thetaN), 0, cos(thetaN)))
       }
     }
-    faces.push(topface)
+    faces.push(bottomface)
     axes.push(new Vec3(0, 1, 0))
 
-    // Reorder bottom face
+    // Reorder top face
     const temp = []
-    for (let i = 0; i < bottomface.length; i++) {
-      temp.push(bottomface[bottomface.length - i - 1])
+    for (let i = 0; i < topface.length; i++) {
+      temp.push(topface[topface.length - i - 1])
     }
     faces.push(temp)
 
     super({ vertices, faces, axes })
+
+    this.type = Shape.types.CYLINDER
+    this.radiusTop = radiusTop
+    this.radiusBottom = radiusBottom
+    this.height = height
+    this.numSegments = numSegments
   }
 }
